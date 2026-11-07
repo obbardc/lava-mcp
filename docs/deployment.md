@@ -78,6 +78,20 @@ docker compose up -d
 - The [artifact store](artifact-store.md) routes ride the same `/mcp*` path under
   `/mcp/artifacts` (uploads/downloads over 443).
 
+### Behind an existing Traefik
+
+If the host already runs Traefik (e.g. in front of LAVA itself), use
+`docker-compose.traefik.yml` instead: it drops Caddy and attaches lava-mcp to
+Traefik's network with router labels. Add `LAVA_MCP_TRAEFIK_NETWORK` and
+`LAVA_MCP_TRAEFIK_CERTRESOLVER` (and optionally `LAVA_MCP_TRAEFIK_ENTRYPOINT`,
+default `websecure`) to `.env`, then:
+
+```sh
+docker compose -f docker-compose.traefik.yml up -d
+```
+
+Traefik proxies WebSockets and streams responses without extra configuration.
+
 Or run the HTTP transport directly:
 
 ```sh

@@ -1,0 +1,55 @@
+# Hosted lava-mcp behind an existing Traefik reverse proxy (instead of the bundled
+# Caddy in docker-compose.yml). Traefik terminates TLS and routes the MCP HTTP
+# endpoint, including the /mcp/gateway-ssh WebSocket and /mcp/artifacts routes.
+#
+#   cp .env.example .env   # then edit, and add the LAVA_MCP_TRAEFIK_* settings below
+#   docker compose -f docker-compose.traefik.yml up -d
+#   # or: podman-compose -f docker-compose.traefik.yml up -d
+#
+# Required in .env (besides LAVA_URL, LAVA_MCP_DOMAIN, LAVA_MCP_GATEWAY_HOST):
+#   LAVA_MCP_TRAEFIK_NETWORK       existing network Traefik watches (created beforehand)
+#   LAVA_MCP_TRAEFIK_CERTRESOLVER  Traefik certificate resolver name
+# Optional:
+#   LAVA_MCP_TRAEFIK_ENTRYPOINT    TLS entrypoint (default: websecure)
+#
+# Agents connect to:  https://<LAVA_MCP_DOMAIN>/mcp
+services:
+  lava-mcp:
+    build: .
+    restart: unless-stopped
+    # See docker-compose.yml: tini reaps orphaned git helper processes.
+    init: true
+    environment:
+      LAVA_URL: ${LAVA_URL:-}
+      LAVA_SOURCE_REPO: ${LAVA_SOURCE_REPO:-}
+      LAVA_SOURCE_REF: ${LAVA_SOURCE_REF:-}
+      LAVA_MCP_TRANSPORT: streamable-http
+      LAVA_MCP_HOST: 0.0.0.0
+      LAVA_MCP_PORT: "8000"
+      LAVA_MCP_GATEWAY_ENABLED: "true"
+      LAVA_MCP_GATEWAY_BIND: 0.0.0.0
+      LAVA_MCP_GATEWAY_PORT: "2222"
+      LAVA_MCP_GATEWAY_ADVERTISE_HOST: ${LAVA_MCP_GATEWAY_HOST}
+      LAVA_MCP_GATEWAY_ADVERTISE_PORT: "2222"
+      LAVA_MCP_GATEWAY_WS_URL: wss://${LAVA_MCP_DOMAIN}/mcp/gateway-ssh
+      LAVA_MCP_GATEWAY_ALLOW_IPS: ${LAVA_MCP_GATEWAY_ALLOW_IPS:-}
+      LAVA_MCP_HTTP_ALLOW_USERS: ${LAVA_MCP_HTTP_ALLOW_USERS:-}
+      LAVA_MCP_SSH_ALLOW_USERS: ${LAVA_MCP_SSH_ALLOW_USERS:-}
+      LAVA_MCP_REMOTE_ACCESS_TAG: ${LAVA_MCP_REMOTE_ACCESS_TAG:-allow-remote-access}
+    ports:
+      - "2222:2222"   # SSH gateway (TCP) — must be reachable by lab containers
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${LAVA_MCP_TRAEFIK_NETWORK}
+      - traefik.http.routers.lava-mcp.rule=Host(`${LAVA_MCP_DOMAIN}`)
+      - traefik.http.routers.lava-mcp.entrypoints=${LAVA_MCP_TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.lava-mcp.tls=true
+      - traefik.http.routers.lava-mcp.tls.certresolver=${LAVA_MCP_TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.lava-mcp.loadbalancer.server.port=8000
+
+networks:
+  proxy:
+    name: ${LAVA_MCP_TRAEFIK_NETWORK}
+    external: true
