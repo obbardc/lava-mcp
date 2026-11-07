@@ -50,7 +50,11 @@ free. Results and logs are retrievable per job.
 
 This server proxies one LAVA instance: query devices/jobs, submit and manage test
 jobs, and open interactive sessions to a board. General LAVA tools grant exactly what
-your own LAVA token grants.
+your own LAVA token grants. If whoami returns an empty `user` (no user), no valid LAVA
+token was supplied and you are anonymous: only public data is readable and
+authenticated tools (submitting or cancelling jobs, board sessions) will fail. Tell
+the user to supply a token (the X-Lava-Token header for a hosted server, or
+LAVA_TOKEN in stdio mode) rather than retrying.
 
 THE STANDARD WAY TO USE LAVA — reach for this first — is a non-interactive job: a YAML
 definition with an `actions:` list that DEPLOYS an image to the board (fetch/flash),
